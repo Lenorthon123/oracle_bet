@@ -3,15 +3,10 @@ import math
 import json
 import time
 import requests
+from flask import Flask, render_template, request
 
-from flask import Flask, render_template, jsonify, request
+app = Flask(__name__)
 
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-
-app = Flask(
-    __name__,
-    template_folder=os.path.join(BASE_DIR, "templates")
-)
 # --- CONFIG ---
 ODDS_API_KEY = os.environ.get("THE_ODDS_API_KEY")
 FOOTBALL_API_KEY = os.environ.get("FOOTBALL_API_KEY")  # api-sports.io
@@ -180,8 +175,8 @@ def fetch_live_odds(sport_key):
     try:
         url = (
             f"https://api.the-odds-api.com/v4/sports/{sport_key}/odds/"
-            f"?regions=eu&markets=h2h,totals&oddsFormat=decimal&apiKey={ODDS_API_KEY}"
-       )
+            f"?regions=eu&markets=h2h,totals,btts&oddsFormat=decimal&apiKey={ODDS_API_KEY}"
+        )
         resp = requests.get(url, timeout=10)
         resp.raise_for_status()
         data = resp.json()
@@ -210,11 +205,8 @@ def best_odds_per_outcome(bookmakers, market_key, outcome_name, point=None):
 
 @app.route('/')
 def home():
-    sport_key = request.args.get('league', 'soccer_fifa_world_cup')
-    
+    sport_key = request.args.get('league', 'soccer_world_cup')
     raw_data = fetch_live_odds(sport_key)
-    print("Nombre de matchs :", len(raw_data))
-    print(json.dumps(raw_data[:2], indent=2))
     processed = []
 
     for item in raw_data:
