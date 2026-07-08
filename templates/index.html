@@ -3,112 +3,161 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SaaS Betting Intelligence Dashboard</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <title>IA Predictive Betting Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+    </style>
 </head>
-<body class="bg-[#F8FAFC] text-slate-800 font-sans min-h-screen">
+<body class="bg-gray-950 text-gray-100 min-h-screen">
 
-    <header class="bg-white border-b border-slate-200 sticky top-0 z-50 shadow-xs">
-        <div class="max-w-7xl mx-auto px-6 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
-            <div class="flex items-center space-x-3">
-                <div class="w-3 h-7 bg-emerald-600 rounded-xs"></div>
-                <h1 class="text-xl font-bold tracking-tight text-slate-900">QUANT-PREDICT <span class="text-xs font-mono font-normal text-slate-500 px-2 py-0.5 bg-slate-100 rounded ml-2">v4.0 Live</span></h1>
-            </div>
-            <div class="flex items-center space-x-4 text-xs font-mono">
-                <span class="flex items-center text-slate-600"><span class="w-2 h-2 rounded-full bg-emerald-500 mr-2 animate-pulse"></span>Flux Data : Connecté</span>
-                <span class="text-slate-400">|</span>
-                <span class="bg-slate-900 text-white px-3 py-1 rounded font-bold">MODE COMPLET AUTOMATISÉ</span>
-            </div>
-        </div>
-    </header>
-
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 py-8">
-        
-        <div class="bg-white rounded-xl p-6 border border-slate-200 shadow-xs mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-            <div>
-                <h2 class="text-sm font-semibold text-slate-500 uppercase tracking-wider">Moniteur de Trading Actif</h2>
-                <p class="text-2xl font-black text-slate-900 mt-1">{{ total_signals }} Opportunités d'Arbitrage Détectées (EV+)</p>
-            </div>
-            <div class="text-xs bg-emerald-50 text-emerald-800 border border-emerald-200 font-semibold px-4 py-2 rounded-lg">
-                Seuil de coupure algorithmique réglé à +4.0% minimum
-            </div>
-        </div>
-
-        <div class="space-y-8">
-            {% for match in matches %}
-            <div class="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm hover:border-slate-300 transition-all">
-                
-                <div class="bg-slate-50 border-b border-slate-200 p-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
-                    <div>
-                        <div class="flex items-center gap-2">
-                            <span class="text-[11px] font-bold uppercase px-2 py-0.5 bg-indigo-100 text-indigo-800 rounded">{{ match.sport }}</span>
-                            <span class="text-[11px] font-mono text-slate-500 bg-slate-200/60 px-2 py-0.5 rounded">{{ match.meteo }}</span>
-                        </div>
-                        <h3 class="text-base font-bold text-slate-900 mt-1.5">{{ match.affiche }}</h3>
-                    </div>
-                    <div class="text-right">
-                        <p class="text-xs font-mono font-bold text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-lg inline-block border border-indigo-100">
-                            ⏱️ {{ match.gmt_time }}
-                        </p>
-                    </div>
+    <nav class="border-b border-gray-800 bg-gray-900/50 backdrop-blur-md sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="bg-green-500 text-gray-950 p-2 rounded-lg font-bold tracking-wider text-xs">
+                    PROP-IA
                 </div>
+                <span class="font-bold text-xl tracking-tight bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent">
+                    Predictive Analytics Engine
+                </span>
+            </div>
+            <div class="flex items-center gap-4">
+                <div class="bg-gray-800 px-3 py-1.5 rounded-full border border-gray-700 text-xs font-semibold text-gray-300 flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-green-400 animate-pulse"></span>
+                    API Connectée
+                </div>
+            </div>
+        </div>
+    </nav>
 
-                <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {% for marche in match.marches %}
-                    <div class="border border-slate-100 rounded-xl p-4 bg-slate-50/40">
-                        <h4 class="text-xs font-bold uppercase tracking-wide text-slate-500 mb-3 flex items-center">
-                            <span class="w-1.5 h-3 bg-slate-400 rounded-xs mr-2"></span>
-                            {{ marche.marche_titre }}
-                        </h4>
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+            <div class="bg-gray-900 p-5 rounded-2xl border border-gray-800 flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Total Matchs Analysés</p>
+                    <h3 class="text-3xl font-bold mt-1 text-white">{{ matches|length }}</h3>
+                </div>
+                <div class="p-3 bg-blue-500/10 text-blue-400 rounded-xl">
+                    📊
+                </div>
+            </div>
+            <div class="bg-gray-900 p-5 rounded-2xl border border-gray-800 flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Signaux Détectés (Value Bets)</p>
+                    <h3 class="text-3xl font-bold mt-1 text-green-400">{{ total_signals }}</h3>
+                </div>
+                <div class="p-3 bg-green-500/10 text-green-400 rounded-xl">
+                    ⚡
+                </div>
+            </div>
+        </div>
 
-                        <div class="space-y-2.5">
-                            {% for option in marche.options %}
-                            <div class="flex items-center justify-between p-3 rounded-lg border text-xs bg-white {% if option.is_value %}border-emerald-500/40 bg-emerald-50/10 shadow-xs{% else %}border-slate-200/70{% endif %}">
-                                
-                                <div class="w-5/12">
-                                    <p class="font-semibold text-slate-800 truncate">{{ option.intitule }}</p>
-                                    <p class="text-[10px] text-slate-400 font-mono mt-0.5">Probabilité IA : {{ option.prob }}%</p>
-                                </div>
+        <div class="mb-8 bg-gray-900 p-4 rounded-2xl border border-gray-800 shadow-lg">
+            <form method="GET" action="/" class="flex flex-col sm:flex-row items-center justify-between gap-4">
+                <label for="league" class="text-white font-semibold text-base flex items-center gap-2">
+                    🌍 Zone de Scan Aéroportée (Championnat) :
+                </label>
+                <select name="league" id="league" onchange="this.form.submit()" class="bg-gray-950 text-white px-4 py-2.5 rounded-xl border border-gray-700 focus:outline-none focus:border-green-500 cursor-pointer w-full sm:w-80 font-medium transition">
+                    {% for key, name in leagues.items() %}
+                        <option value="{{ key }}" {% if key == selected_league %}selected{% endif %}>{{ name }}</option>
+                    {% endfor %}
+                </select>
+            </form>
+        </div>
 
-                                <div class="w-2/12 text-center">
-                                    <span class="font-mono font-bold text-slate-900 text-sm bg-slate-100 px-2 py-1 rounded">
-                                        {{ option.cote }}
-                                    </span>
-                                </div>
-
-                                <div class="w-5/12 text-right">
-                                    {% if option.is_value %}
-                                        <div class="inline-block text-right">
-                                            <span class="block text-emerald-600 font-bold font-mono text-[11px]">+{{ option.value }}% EV+</span>
-                                            <span class="inline-block bg-emerald-600 text-white font-bold text-[9px] px-2 py-0.5 rounded mt-0.5 shadow-xs">
-                                                KELLY : {{ option.mise }}%
-                                            </span>
-                                        </div>
-                                    {% else %}
-                                        <span class="text-[10px] font-mono text-slate-400 bg-slate-100 px-2 py-1 rounded">Aucun Avantage</span>
-                                    {% endif %}
-                                </div>
-
+        {% if matches %}
+            <div class="space-y-6">
+                {% for match in matches %}
+                    <div class="bg-gray-900 rounded-2xl border border-gray-800 p-6 shadow-xl transition-all hover:border-gray-700">
+                        
+                        <div class="flex flex-col sm:flex-row sm:items-center justify-between border-b border-gray-800 pb-4 mb-4 gap-2">
+                            <div>
+                                <span class="text-xs font-bold uppercase tracking-widest text-green-400 bg-green-500/10 px-2.5 py-1 rounded-md">
+                                    {{ match.sport }}
+                                </span>
+                                <h2 class="text-xl font-bold text-white mt-2">{{ match.affiche }}</h2>
                             </div>
+                            <div class="flex flex-wrap items-center gap-3 text-xs text-gray-400">
+                                <span class="bg-gray-950 px-3 py-1.5 rounded-lg border border-gray-800 font-mono">
+                                    🕒 {{ match.gmt_time }}
+                                </span>
+                                <span class="bg-gray-950 px-3 py-1.5 rounded-lg border border-gray-800">
+                                    {{ match.meteo }}
+                                </span>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {% for marche in match.marches %}
+                                <div class="bg-gray-950/60 rounded-xl p-4 border border-gray-800/80">
+                                    <h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 pb-2 border-b border-gray-800/50">
+                                        {{ marche.marche_titre }}
+                                    </h4>
+                                    
+                                    <div class="space-y-2">
+                                        {% for option in marche.options %}
+                                            <div class="flex items-center justify-between p-2.5 rounded-lg border {% if option.is_value %}bg-green-500/5 border-green-500/30 hover:bg-green-500/10{% else %}bg-gray-900/40 border-gray-800/60{% endif %} transition">
+                                                <div class="flex flex-col">
+                                                    <span class="text-sm font-semibold {% if option.is_value %}text-green-300{% else %}text-gray-200{% endif %}">
+                                                        {{ option.intitule }}
+                                                    </span>
+                                                    <span class="text-[11px] text-gray-400 mt-0.5">
+                                                        Probabilité IA : <b class="font-mono">{{ option.prob }}%</b>
+                                                    </span>
+                                                </div>
+                                                
+                                                <div class="flex items-center gap-3">
+                                                    <div class="text-right">
+                                                        <span class="text-xs text-gray-500 block">Cote</span>
+                                                        <span class="font-mono font-bold text-sm {% if option.is_value %}text-green-400{% else %}text-white{% endif %}">
+                                                            {{ "%.2f"|format(option.cote) }}
+                                                        </span>
+                                                    </div>
+
+                                                    {% if option.is_value %}
+                                                        <div class="bg-green-500/20 px-2.5 py-1 rounded border border-green-500/40 text-center min-w-[70px]">
+                                                            <span class="text-[10px] uppercase font-bold text-green-400 block tracking-wider">Value</span>
+                                                            <span class="text-xs font-mono font-bold text-green-300">+{{ option.value }}%</span>
+                                                        </div>
+                                                        <div class="bg-yellow-500/10 px-2 py-1 rounded border border-yellow-500/30 text-center min-w-[55px]">
+                                                            <span class="text-[9px] uppercase font-bold text-yellow-500 block">Mise Kelly</span>
+                                                            <span class="text-xs font-mono font-bold text-yellow-400">{{ option.mise }}%</span>
+                                                        </div>
+                                                    {% endif %}
+                                                </div>
+                                            </div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
                             {% endfor %}
                         </div>
 
                     </div>
-                    {% endfor %}
-                </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="bg-gray-900 rounded-2xl border border-gray-800 p-12 text-center shadow-md max-w-lg mx-auto mt-12">
+                <div class="text-4xl mb-4">📡</div>
+                <h3 class="text-lg font-bold text-white mb-2">Aucun match disponible</h3>
+                <p class="text-sm text-gray-400 mb-6">
+                    Aucun événement majeur ou données de bookmakers n'ont été transmis par l'API pour ce championnat en ce moment précis.
+                </p>
+                <a href="/" class="bg-green-500 text-gray-950 font-bold px-5 py-2.5 rounded-xl text-sm transition hover:bg-green-400 inline-block">
+                    Réinitialiser le scan global
+                </a>
+            </div>
+        {% endif %}
 
-            </div>
-            {% else %}
-            <div class="text-center py-16 bg-white border border-slate-200 rounded-xl">
-                <p class="text-sm text-slate-500 font-mono">Aucun événement en cours. En attente de transmission de données...</p>
-                <p class="text-xs text-slate-400 mt-1">Assurez-vous que votre clé `THE_ODDS_API_KEY` est valide dans votre script backend.</p>
-            </div>
-            {% endfor %}
-        </div>
     </main>
 
-    <footer class="text-center py-12 text-[10px] font-mono text-slate-400 border-t border-slate-200 bg-white mt-20">
-        QUANT-PREDICT CORE INFRASTRUCTURE // GMT SYNCHRONIZED ARCHITECTURE // PRODUCTION COMPONENT.
+    <footer class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 mt-12 border-t border-gray-900 text-center text-xs text-gray-600">
+        &copy; 2026 Predictive Analytics App - Systèmes d'analyse de données déterministes.
     </footer>
 
 </body>
