@@ -7,7 +7,7 @@ template_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'te
 app = Flask(__name__, template_folder=template_dir)
 
 # Clé API de production
-THE_ODDS_API_KEY = "TON_API_KEY_ICI"
+THE_ODDS_API_KEY = "d199c60335a985f260877666a8aa5c0f"
 
 def routing_ia_prediction(market_key, outcome_name, outcome_point, sport, context):
     """
