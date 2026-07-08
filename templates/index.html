@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ORACLE TERMINAL - Flux Multi-Marchés</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background-color: #040711; }
+        .glow-cyan { text-shadow: 0 0 12px rgba(0, 240, 255, 0.4); }
+        .glow-pink { text-shadow: 0 0 12px rgba(255, 0, 122, 0.4); }
+        .box-glow-pink { box-shadow: 0 0 15px rgba(255, 0, 122, 0.15); border-color: #FF007A; }
+    </style>
+</head>
+<body class="text-slate-300 font-sans min-h-screen selection:bg-[#FF007A] selection:text-white">
+
+    <nav class="border-b border-slate-900 bg-[#080D1A] px-8 py-4 flex justify-between items-center shadow-md">
+        <div class="flex items-center space-x-4">
+            <span class="text-2xl font-black tracking-wider text-[#00F0FF] glow-cyan">ORACLE CORE</span>
+            <span class="bg-slate-800 text-slate-400 text-[9px] font-mono uppercase px-2 py-0.5 rounded border border-slate-700">MULTI-MARKET ENGINE</span>
+        </div>
+        <div class="text-xs text-slate-500 font-mono">
+            FLUX DIRECT : <span class="text-emerald-400 font-bold">ACTIF (1N2 + OPTIONS)</span>
+        </div>
+    </nav>
+
+    <main class="max-w-6xl mx-auto px-4 py-8">
+        
+        <div class="bg-[#080D1A] border border-slate-900 p-5 rounded-2xl mb-8 flex justify-between items-center">
+            <div>
+                <p class="text-xs uppercase font-bold tracking-wider text-slate-500">Signaux d'Arbitrage Détectés</p>
+                <p class="text-2xl font-black text-white mt-1">{{ total_values }} Inefficiences Mathématiques (EV+)</p>
+            </div>
+            <span class="bg-gradient-to-r from-[#FF007A] to-purple-600 text-white text-xs font-black px-4 py-2 rounded-xl shadow-lg">LIVE MONITORING</span>
+        </div>
+
+        <div class="space-y-10">
+            {% for match in matches %}
+            <div class="bg-[#080D1A] border border-slate-900 rounded-2xl p-6 shadow-sm">
+                
+                <div class="flex flex-col md:flex-row md:items-center justify-between pb-4 mb-6 border-b border-slate-800/50">
+                    <div>
+                        <span class="text-[10px] uppercase font-bold tracking-widest text-cyan-400 bg-cyan-950/40 px-2.5 py-1 rounded border border-cyan-900/50">{{ match.sport }}</span>
+                        <h2 class="text-lg font-bold text-white mt-2">{{ match.affiche }}</h2>
+                    </div>
+                    <div class="mt-2 md:mt-0 text-xs text-slate-400 bg-slate-900/60 p-2 rounded-xl border border-slate-800 font-mono max-w-md">
+                        <span class="text-cyan-400 font-bold">💡 Contextuel :</span> {{ match.context_info }}
+                    </div>
+                </div>
+
+                <div class="space-y-6">
+                    {% for marche in match.marches %}
+                    <div class="bg-slate-950/40 rounded-xl p-4 border border-slate-900">
+                        <h3 class="text-xs uppercase tracking-wider font-black text-slate-400 mb-3 flex items-center">
+                            <span class="w-1.5 h-3 bg-purple-500 inline-block mr-2 rounded-xs"></span>
+                            {{ marche.nom_marche }}
+                        </h3>
+
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left text-xs font-mono">
+                                <thead>
+                                    <tr class="text-slate-600 uppercase tracking-wider text-[10px] border-b border-slate-900/80">
+                                        <th class="pb-2">Option de Sélection</th>
+                                        <th class="pb-2">Cote</th>
+                                        <th class="pb-2">Probabilité IA</th>
+                                        <th class="pb-2">Marge (EV)</th>
+                                        <th class="pb-2 text-right">Mise Préconisée</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-900/40">
+                                    {% for pari in marche.paris %}
+                                    <tr class="{% if pari.is_value %}bg-[#FF007A]/[0.02]{% endif %}">
+                                        <td class="py-3 font-sans font-bold text-slate-200">{{ pari.intitule }}</td>
+                                        <td class="py-3 font-bold text-[#00F0FF] text-sm">{{ pari.cote }}</td>
+                                        <td class="py-3 text-slate-400 font-bold">{{ pari.fiabilite }}%</td>
+                                        <td class="py-3">
+                                            {% if pari.is_value %}
+                                                <span class="text-[#FF007A] font-black glow-pink">+{{ pari.value }}% EV+</span>
+                                            {% else %}
+                                                <span class="text-slate-600">Négatif</span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="py-3 text-right font-sans">
+                                            {% if pari.is_value %}
+                                                <span class="inline-block bg-[#FF007A] text-white text-[10px] font-black px-3 py-1.5 rounded-lg box-glow-pink">
+                                                    KELLY : {{ pari.mise_conseillee }}%
+                                                </span>
+                                            {% else %}
+                                                <span class="text-[9px] uppercase font-bold text-slate-600 bg-slate-900/20 px-2 py-1 rounded">Passer</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+
+            </div>
+            {% endfor %}
+        </div>
+    </main>
+
+    <footer class="text-center py-10 text-[9px] font-mono text-slate-600 border-t border-slate-900/60 mt-16">
+        ORACLE ARCHITECTURE COMPLÈTE v3.0 // ANALYSEUR CYBERNÉTIQUE DE VALUE BETS MULTI-COTES.
+    </footer>
+
+</body>
+</html>
