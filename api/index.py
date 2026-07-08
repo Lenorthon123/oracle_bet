@@ -8,8 +8,8 @@ from flask import Flask, render_template, request
 app = Flask(__name__)
 
 # --- CONFIG ---
-ODDS_API_KEY = os.environ.get("d199c60335a985f260877666a8aa5c0f")
-FOOTBALL_API_KEY = os.environ.get("faf0ae629f12816a4af994479d0bfd7f")  # api-sports.io
+ODDS_API_KEY = os.environ.get("THE_ODDS_API_KEY")
+FOOTBALL_API_KEY = os.environ.get("FOOTBALL_API_KEY")  # api-sports.io
 if not ODDS_API_KEY or not FOOTBALL_API_KEY:
     raise RuntimeError("THE_ODDS_API_KEY et FOOTBALL_API_KEY doivent être définies dans l'environnement")
 
