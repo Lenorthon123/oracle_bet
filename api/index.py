@@ -211,7 +211,10 @@ def best_odds_per_outcome(bookmakers, market_key, outcome_name, point=None):
 @app.route('/')
 def home():
     sport_key = request.args.get('league', 'soccer_fifa_world_cup')
+    print(sport_key)
     raw_data = fetch_live_odds(sport_key)
+    print("Nombre de matchs :", len(raw_data))
+    print(json.dumps(raw_data[:2], indent=2))
     processed = []
 
     for item in raw_data:
