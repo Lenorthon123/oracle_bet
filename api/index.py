@@ -1,178 +1,250 @@
 import os
-import random
+import math
+import json
+import time
 import requests
-from datetime import datetime
 from flask import Flask, render_template, request
 
-template_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'templates'))
-app = Flask(__name__, template_folder=template_dir)
+app = Flask(__name__)
 
-# 🔑 METS TA CLÉ ICI
-THE_ODDS_API_KEY = "TON_API_KEY_ICI"
+# --- CONFIG ---
+ODDS_API_KEY = os.environ.get("d199c60335a985f260877666a8aa5c0f")
+FOOTBALL_API_KEY = os.environ.get("faf0ae629f12816a4af994479d0bfd7f")  # api-sports.io
+if not ODDS_API_KEY or not FOOTBALL_API_KEY:
+    raise RuntimeError("THE_ODDS_API_KEY et FOOTBALL_API_KEY doivent être définies dans l'environnement")
 
-# 🌍 DICTIONNAIRE DES CHAMPIONNATS DISPONIBLES DANS L'API
-LEAGUES = {
-    "soccer_usa_mls": "🇺🇸 MLS (USA)",
-    "soccer_france_ligue_1": "🇫🇷 Ligue 1 (France)",
-    "soccer_epl": "🇬🇧 Premier League (Angleterre)",
-    "soccer_spain_la_liga": "🇪🇸 La Liga (Espagne)",
-    "soccer_italy_serie_a": "🇮🇹 Serie A (Italie)",
-    "soccer_germany_bundesliga": "🇩🇪 Bundesliga (Allemagne)",
-    "soccer_uefa_champs_league": "🇪🇺 Champions League",
-    "soccer_uefa_europa_league": "🇪🇺 Europa League"
-}
+FOOTBALL_API_BASE = "https://v3.football.api-sports.io"
+FOOTBALL_HEADERS = {"x-apisports-key": FOOTBALL_API_KEY}
 
-def generate_team_features(team_name):
-    seed = sum(ord(char) for char in team_name)
-    rng = random.Random(seed)
+WORLD_CUP_LEAGUE_ID = 1     # FIFA World Cup dans API-Football
+SEASON = 2026
+
+# Quota API-Football = 100 req/jour en free tier -> cache disque obligatoire
+STATS_CACHE_FILE = "team_stats_cache.json"
+STATS_CACHE_TTL = 12 * 3600  # 12h : les stats de forme ne changent pas match par match
+
+TEAM_ID_CACHE_FILE = "team_ids_cache.json"
+
+ODDS_CACHE_TTL = 300
+_odds_cache = {}
+
+
+# --- PERSISTENCE HELPERS ---
+def _load_json(path):
+    if os.path.exists(path):
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return {}
+
+
+def _save_json(path, data):
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+
+# --- API-FOOTBALL: résolution nom -> id ---
+def get_team_id(team_name):
+    cache = _load_json(TEAM_ID_CACHE_FILE)
+    if team_name in cache:
+        return cache[team_name]
+
+    resp = requests.get(
+        f"{FOOTBALL_API_BASE}/teams",
+        headers=FOOTBALL_HEADERS,
+        params={"search": team_name},
+        timeout=10,
+    )
+    resp.raise_for_status()
+    results = resp.json().get("response", [])
+    if not results:
+        return None
+
+    team_id = results[0]["team"]["id"]
+    cache[team_name] = team_id
+    _save_json(TEAM_ID_CACHE_FILE, cache)
+    return team_id
+
+
+# --- API-FOOTBALL: stats réelles (buts marqués/encaissés en moyenne) ---
+def fetch_team_stats(team_name):
+    cache = _load_json(STATS_CACHE_FILE)
+    now = time.time()
+
+    entry = cache.get(team_name)
+    if entry and (now - entry["ts"]) < STATS_CACHE_TTL:
+        return entry["data"]
+
+    team_id = get_team_id(team_name)
+    if not team_id:
+        return None
+
+    resp = requests.get(
+        f"{FOOTBALL_API_BASE}/teams/statistics",
+        headers=FOOTBALL_HEADERS,
+        params={"league": WORLD_CUP_LEAGUE_ID, "season": SEASON, "team": team_id},
+        timeout=10,
+    )
+    resp.raise_for_status()
+    data = resp.json().get("response", {})
+
+    goals_for = data.get("goals", {}).get("for", {}).get("average", {}).get("total")
+    goals_against = data.get("goals", {}).get("against", {}).get("average", {}).get("total")
+
+    if goals_for is None or goals_against is None:
+        return None  # équipe sans historique dispo (ex: pas encore joué dans ce tournoi)
+
+    stats = {"avg_scored": float(goals_for), "avg_conceded": float(goals_against)}
+    cache[team_name] = {"ts": now, "data": stats}
+    _save_json(STATS_CACHE_FILE, cache)
+    return stats
+
+
+# --- FALLBACK si équipe sans stats (ex: tout début de tournoi) ---
+LEAGUE_AVG_GOALS = 1.35  # moyenne de buts/équipe/match, ballpark Coupe du Monde
+DEFAULT_STATS = {"avg_scored": LEAGUE_AVG_GOALS, "avg_conceded": LEAGUE_AVG_GOALS}
+
+
+def get_stats(team_name):
+    stats = fetch_team_stats(team_name)
+    return (stats if stats else DEFAULT_STATS), (stats is not None)
+
+
+# --- MOTEUR POISSON ---
+def poisson_prob(k, lamb):
+    return (lamb ** k * math.exp(-lamb)) / math.factorial(k)
+
+
+def get_match_probas(home_team, away_team):
+    h, h_real = get_stats(home_team)
+    a, a_real = get_stats(away_team)
+
+    # lambda = moyenne des forces attaque/défense des deux équipes, + avantage domicile
+    lambda_home = ((h["avg_scored"] + a["avg_conceded"]) / 2) * 1.15
+    lambda_away = ((a["avg_scored"] + h["avg_conceded"]) / 2) * 0.90
+
+    home_win = draw = away_win = 0
+    for i in range(6):
+        for j in range(6):
+            prob = poisson_prob(i, lambda_home) * poisson_prob(j, lambda_away)
+            if i > j:
+                home_win += prob
+            elif i == j:
+                draw += prob
+            else:
+                away_win += prob
+
     return {
-        "attack_power": rng.uniform(1.2, 3.2),
-        "defense_power": rng.uniform(0.8, 2.5),
-        "form_index": rng.uniform(0.3, 0.9)
+        "home": home_win, "draw": draw, "away": away_win,
+        "l_h": lambda_home, "l_a": lambda_away,
+        "has_real_stats": h_real and a_real,
     }
 
-def advanced_predictive_engine(market_key, selection, point, sport, ctx):
-    h_stat = ctx["home_stats"]
-    a_stat = ctx["away_stats"]
-    
-    if market_key == "h2h":
-        force_domicile = (h_stat["attack_power"] / a_stat["defense_power"]) * h_stat["form_index"]
-        force_exterieur = (a_stat["attack_power"] / h_stat["defense_power"]) * a_stat["form_index"]
-        force_domicile += (ctx["repos_home"] * 0.02) - (ctx["absents_home"] * 0.05) + 0.1
-        force_exterieur += (ctx["repos_away"] * 0.02) - (ctx["absents_away"] * 0.05)
-        
-        total_force = force_domicile + force_exterieur + 0.5
-        prob_home = max(0.05, min(0.85, force_domicile / total_force))
-        prob_away = max(0.05, min(0.85, force_exterieur / total_force))
-        prob_draw = max(0.10, min(0.35, 1.0 - prob_home - prob_away))
-            
-        somme = prob_home + prob_away + prob_draw
-        prob_home, prob_away, prob_draw = prob_home/somme, prob_away/somme, prob_draw/somme
 
-        if selection == "Draw": return round(prob_draw, 2)
-        elif selection == "Home": return round(prob_home, 2)
-        else: return round(prob_away, 2)
+def advanced_predictive_engine(market_key, selection, point, stats):
+    if market_key == "h2h":
+        if selection == "Home":
+            return round(stats["home"], 3)
+        if selection == "Draw":
+            return round(stats["draw"], 3)
+        return round(stats["away"], 3)
 
     elif market_key == "totals":
-        target = float(point) if point else 2.5
-        expected_total = (h_stat["attack_power"] + a_stat["attack_power"]) / (h_stat["defense_power"] + a_stat["defense_power"]) * 2.4
-        if ctx["meteo_degradee"]: expected_total *= 0.85
-        prob_over = 1.0 / (1.0 + (target / expected_total)**2.7)
-        return round(prob_over, 2) if selection == "Over" else round(1.0 - prob_over, 2)
+        target = float(point)
+        prob_over = sum(
+            poisson_prob(i, stats["l_h"]) * poisson_prob(j, stats["l_a"])
+            for i in range(6) for j in range(6) if (i + j) > target
+        )
+        return round(prob_over, 3) if selection == "Over" else round(1 - prob_over, 3)
 
     elif market_key == "btts":
-        prob_btts = (h_stat["attack_power"] * a_stat["attack_power"]) / (h_stat["defense_power"] * a_stat["defense_power"] * 2.1)
-        return round(max(0.25, min(0.85, prob_btts)), 2) if selection == "Yes" else round(1.0 - max(0.25, min(0.85, prob_btts)), 2)
+        prob_home_goal = 1 - poisson_prob(0, stats["l_h"])
+        prob_away_goal = 1 - poisson_prob(0, stats["l_a"])
+        prob_btts = prob_home_goal * prob_away_goal
+        return round(prob_btts, 3) if selection == "Yes" else round(1 - prob_btts, 3)
 
-    elif market_key == "spreads":
-        margin = float(point) if point else 0.0
-        force_diff = (h_stat["attack_power"] - a_stat["attack_power"]) * 0.35
-        prob_cover = max(0.05, min(0.95, 0.5 + (force_diff - (margin * 0.20))))
-        return round(prob_cover, 2) if selection == "Home" else round(1.0 - prob_cover, 2)
+    return None
 
-    return 0.33
 
-def fetch_live_data(sport_key):
-    if not THE_ODDS_API_KEY or THE_ODDS_API_KEY == "TON_API_KEY_ICI":
-        return []
+# --- COTES (The Odds API) ---
+def fetch_live_odds(sport_key):
+    now = time.time()
+    cached = _odds_cache.get(sport_key)
+    if cached and (now - cached["ts"]) < ODDS_CACHE_TTL:
+        return cached["data"]
+
     try:
-        # ✅ L'URL s'adapte dynamiquement à la ligue demandée
-        url = f"https://api.the-odds-api.com/v4/sports/{sport_key}/odds/?regions=eu&markets=h2h,totals,spreads,btts&apiKey={THE_ODDS_API_KEY}"
-        response = requests.get(url)
-        if response.status_code == 200:
-            return response.json()
-    except Exception:
-        pass
-    return []
+        url = (
+            f"https://api.the-odds-api.com/v4/sports/{sport_key}/odds/"
+            f"?regions=eu&markets=h2h,totals,btts&oddsFormat=decimal&apiKey={ODDS_API_KEY}"
+        )
+        resp = requests.get(url, timeout=10)
+        resp.raise_for_status()
+        data = resp.json()
+        _odds_cache[sport_key] = {"ts": now, "data": data}
+        return data
+    except requests.RequestException as e:
+        print(f"[fetch_live_odds] Erreur: {e}")
+        return cached["data"] if cached else []
 
-def processing_pipeline(sport_key):
-    raw_data = fetch_live_data(sport_key)
-    processed_matches = []
-    
-    for item in raw_data:
-        sport = item.get("sport_title", "Football")
-        home = item.get("home_team", "Domicile")
-        away = item.get("away_team", "Extérieur")
-        
-        raw_time = item.get("commence_time", "")
-        gmt_time_str = "Heure Inconnue"
-        if raw_time:
-            try:
-                dt = datetime.strptime(raw_time, "%Y-%m-%dT%H:%M:%SZ")
-                gmt_time_str = dt.strftime("%d %b - %H:%M GMT")
-            except Exception:
-                gmt_time_str = raw_time
-        
-        bookmakers = item.get("bookmakers", [])
-        if not bookmakers: continue
-        
-        rng = random.Random(len(home) + len(away))
-        ctx = {
-            "home_stats": generate_team_features(home),
-            "away_stats": generate_team_features(away),
-            "repos_home": rng.randint(3, 7), "repos_away": rng.randint(3, 7),
-            "absents_home": rng.randint(0, 3), "absents_away": rng.randint(0, 3),
-            "meteo_degradee": rng.choice([True, False])
-        }
-        
-        all_markets = []
-        for market in bookmakers[0].get("markets", []):
-            market_key = market.get("key")
-            market_titles = {"h2h": "1N2", "totals": "Total Buts", "btts": "Les 2 marquent", "spreads": "Handicap"}
-            if market_key not in market_titles: continue
-            
-            outcomes_list = []
-            for outcome in market.get("outcomes", []):
-                name = outcome.get("name")
-                price = float(outcome.get("price", 1.0))
-                point = outcome.get("point", None)
-                
-                selection_id = "Home" if name == home else ("Away" if name == away else name)
-                display_label = name
-                if name == "Home": display_label = f"Victoire {home}"
-                if name == "Away": display_label = f"Victoire {away}"
-                if name == "Draw": display_label = "Match Nul"
-                if name == "Yes": display_label = "Oui"
-                if name == "No": display_label = "Non"
-                if point is not None and name not in ["Yes", "No"]: display_label += f" ({point})"
-                
-                p_ia = advanced_predictive_engine(market_key, selection_id, point, sport, ctx)
-                value = (p_ia * price) - 1
-                is_value = value > 0.04
-                
-                kelly_stake = 0
-                if is_value and price > 1:
-                    kelly_stake = round(max(1.0, min(((value / (price - 1)) * 20), 8.0)), 1)
-                
-                outcomes_list.append({
-                    "intitule": display_label, "cote": price, "prob": round(p_ia * 100, 1),
-                    "value": round(value * 100, 1), "is_value": is_value, "mise": kelly_stake
-                })
-                
-            all_markets.append({"marche_titre": market_titles[market_key], "options": outcomes_list})
-            
-        processed_matches.append({
-            "sport": sport, "affiche": f"{home} vs {away}", "gmt_time": gmt_time_str,
-            "meteo": "⚠️ Pluie" if ctx["meteo_degradee"] else "☀️ Beau temps", "marches": all_markets
-        })
-        
-    return processed_matches
+
+def best_odds_per_outcome(bookmakers, market_key, outcome_name, point=None):
+    best = None
+    for bm in bookmakers:
+        for m in bm.get("markets", []):
+            if m["key"] != market_key:
+                continue
+            for o in m.get("outcomes", []):
+                if o["name"] != outcome_name:
+                    continue
+                if point is not None and o.get("point") != point:
+                    continue
+                if best is None or o["price"] > best:
+                    best = o["price"]
+    return best
+
 
 @app.route('/')
 def home():
-    # 📥 On récupère la ligue demandée dans l'URL (Ex: /?league=soccer_france_ligue_1)
-    # Par défaut, si rien n'est coché, on met la MLS qui tourne en été
-    selected_league = request.args.get('league', 'soccer_usa_mls')
-    
-    data = processing_pipeline(selected_league)
-    total_signals = sum(1 for m in data for mar in m["marches"] for opt in mar["options"] if opt["is_value"])
-    
-    return render_template(
-        'index.html', 
-        matches=data, 
-        total_signals=total_signals, 
-        leagues=LEAGUES, 
-        selected_league=selected_league
-    )
+    sport_key = request.args.get('league', 'soccer_world_cup')
+    raw_data = fetch_live_odds(sport_key)
+    processed = []
 
-app = app
+    for item in raw_data:
+        home_team = item.get("home_team")
+        away_team = item.get("away_team")
+        bookmakers = item.get("bookmakers", [])
+
+        if not bookmakers:
+            continue
+
+        match_stats = get_match_probas(home_team, away_team)
+
+        ref_markets = bookmakers[0].get("markets", [])
+        marches = []
+        for m in ref_markets:
+            outcomes = []
+            for o in m.get("outcomes", []):
+                p_ia = advanced_predictive_engine(m["key"], o["name"], o.get("point"), match_stats)
+                if p_ia is None:
+                    continue
+
+                best_price = best_odds_per_outcome(bookmakers, m["key"], o["name"], o.get("point"))
+                cote = best_price if best_price else o["price"]
+
+                val = p_ia * float(cote)
+                outcomes.append({
+                    "name": o["name"],
+                    "cote": cote,
+                    "p_ia": p_ia,
+                    "is_value": val > 1.05,
+                    "confidence": "haute" if match_stats["has_real_stats"] else "faible (pas d'historique tournoi)",
+                })
+            marches.append({"titre": m["key"], "options": outcomes})
+
+        processed.append({"affiche": f"{home_team} vs {away_team}", "marches": marches})
+
+    return render_template('index.html', matches=processed)
+
+
+if __name__ == "__main__":
+    app.run(debug=False)
