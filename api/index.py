@@ -180,17 +180,16 @@ def fetch_live_odds(sport_key):
     try:
         url = (
             f"https://api.the-odds-api.com/v4/sports/{sport_key}/odds/"
-            f"?regions=eu&markets=h2h,totals,btts&oddsFormat=decimal&apiKey={ODDS_API_KEY}"
-        )
+            f"?regions=eu&markets=h2h,totals&oddsFormat=decimal&apiKey={ODDS_API_KEY}"
+       )
         resp = requests.get(url, timeout=10)
         resp.raise_for_status()
-        print(resp.status_code)
-        print(resp.text)
         data = resp.json()
         _odds_cache[sport_key] = {"ts": now, "data": data}
         return data
     except requests.RequestException as e:
         print(f"[fetch_live_odds] Erreur: {e}")
+        print(resp.text if 'resp' in locals() else "Pas de réponse")
         return cached["data"] if cached else []
 
 
@@ -213,6 +212,7 @@ def best_odds_per_outcome(bookmakers, market_key, outcome_name, point=None):
 @app.route('/')
 def home():
     sport_key = request.args.get('league', 'soccer_fifa_world_cup')
+    
     raw_data = fetch_live_odds(sport_key)
     print("Nombre de matchs :", len(raw_data))
     print(json.dumps(raw_data[:2], indent=2))
